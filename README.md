@@ -28,19 +28,18 @@ git --version
 
 ### 3. 실습 프로젝트 내려받기
 
-문서 폴더로 이동한 뒤, 교육 담당자가 제공한 Git 저장소 주소를 붙여넣습니다.
+문서 폴더로 이동한 뒤 프로젝트 저장소를 내려받습니다.
 
 ```powershell
 cd "$HOME\Documents"
-$repo = Read-Host "Git 저장소 주소를 붙여넣으세요"
-git clone $repo berttopic
-cd ".\berttopic"
+git clone https://github.com/ggamsso/bertopic-cli.git
+cd ".\bertopic-cli"
 ```
 
-이미 `berttopic` 프로젝트 폴더를 전달받았다면 `git clone`은 생략하고 해당 폴더로 이동합니다.
+이미 `bertopic-cli` 프로젝트 폴더를 전달받았다면 `git clone`은 생략하고 해당 폴더로 이동합니다.
 
 ```powershell
-cd "C:\실제\berttopic\폴더\경로"
+cd "C:\실제\bertopic-cli\폴더\경로"
 ```
 
 현재 위치가 프로젝트 폴더인지 확인합니다. 목록에 `README.md`, `pyproject.toml`, `uv.lock`이 보여야 합니다.
@@ -60,7 +59,7 @@ winget install --id=astral-sh.uv -e
 설치가 끝나면 PowerShell을 닫았다가 다시 열고 프로젝트 폴더로 돌아옵니다.
 
 ```powershell
-cd "$HOME\Documents\berttopic"
+cd "$HOME\Documents\bertopic-cli"
 uv --version
 ```
 
@@ -92,7 +91,7 @@ uv run bertopic-cli --help
 분석할 Excel 파일을 프로젝트의 `data` 폴더에 복사합니다. 예를 들어 파일 이름을 `papers.xlsx`로 정하면 경로는 다음과 같습니다.
 
 ```text
-berttopic\data\papers.xlsx
+bertopic-cli\data\papers.xlsx
 ```
 
 한 행에는 논문 하나가 있어야 하며, 첫 행에는 열 이름이 있어야 합니다. 예시는 다음과 같습니다.
