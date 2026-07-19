@@ -1,0 +1,25 @@
+[project]
+name = "bertopic-cli"
+version = "0.1.0"
+description = "Run BERTopic on CSV, TSV, or XLSX files from a friendly command-line interface."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "bertopic>=0.17.4,<0.18",
+  "hdbscan>=0.8.33",
+  "openpyxl>=3.1",
+  "pandas>=2.0",
+  "scikit-learn>=1.3",
+  "umap-learn>=0.5",
+]
+
+[project.scripts]
+bertopic-cli = "bertopic_cli.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["bertopic_cli*"]
