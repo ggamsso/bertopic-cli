@@ -268,10 +268,10 @@ uv run bertopic-cli ".\data\papers.xlsx" `
 | `input` | 분석할 CSV, TSV 또는 XLSX 파일입니다. | 필수 | CLI 자체 기능 |
 | `--text-columns 열1 열2 ...` | 분석할 열을 순서대로 합칩니다. 분석 실행 시 필수입니다. | 없음 | CLI 자체 기능 |
 | `--sheet 이름` | XLSX에서 읽을 시트를 선택합니다. | 첫 번째 시트 | CLI 자체 기능 |
-| `--language multilingual|english` | 한국어·혼합 언어 또는 영어 임베딩 모델을 선택합니다. | `multilingual` | [language](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#language) |
+| `--language {multilingual, english}` | 한국어·혼합 언어 또는 영어 임베딩 모델을 선택합니다. | `multilingual` | [language](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#language) |
 | `--embedding-model 이름` | 사용할 SentenceTransformers 모델을 직접 지정합니다. | 언어별 자동 선택 | [Embeddings](https://maartengr.github.io/BERTopic/getting_started/embeddings/embeddings.html) |
 | `--min-topic-size N` | 주제 하나를 만들 최소 문서 수입니다. | 문서 수에 따라 자동 | [min_topic_size](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#min_topic_size) |
-| `--reduce-topics none|auto|N` | 생성된 주제를 나중에 합칩니다. | `none` | [Topic Reduction](https://maartengr.github.io/BERTopic/getting_started/topicreduction/topicreduction.html) |
+| `--reduce-topics {none, auto, N}` | 생성된 주제를 나중에 합칩니다. | `none` | [Topic Reduction](https://maartengr.github.io/BERTopic/getting_started/topicreduction/topicreduction.html) |
 | `--random-seed N` | 반복 실행 결과를 재현하기 위한 난수값입니다. | `42` | [Preventing Stochastic Behavior](https://maartengr.github.io/BERTopic/getting_started/best_practices/best_practices.html#preventing-stochastic-behavior) |
 | `--output 폴더` | 결과를 저장할 폴더입니다. | 입력 파일 옆 자동 생성 | CLI 자체 기능 |
 | `--save-model`, `--no-save-model` | 학습 모델 저장 여부를 선택합니다. | 저장 | [Serialization](https://maartengr.github.io/BERTopic/getting_started/serialization/serialization.html) |
@@ -284,13 +284,13 @@ uv run bertopic-cli ".\data\papers.xlsx" `
 
 | 옵션 | 언제 사용하는가 | 기본값 | 공식 문서 |
 |---|---|---|---|
-| `--ngram-max 1|2|3` | `인공지능 교육`처럼 여러 단어로 된 표현을 찾습니다. | `2` | [ngram_range](https://maartengr.github.io/BERTopic/getting_started/vectorizers/vectorizers.html#ngram_range) |
+| `--ngram-max {1, 2, 3}` | `인공지능 교육`처럼 여러 단어로 된 표현을 찾습니다. | `2` | [ngram_range](https://maartengr.github.io/BERTopic/getting_started/vectorizers/vectorizers.html#ngram_range) |
 | `--stopwords-file 파일` | 조사, 상투어, 도메인 공통어를 대표 키워드에서 제외합니다. | 없음 | [stop_words](https://maartengr.github.io/BERTopic/getting_started/vectorizers/vectorizers.html#stop_words) |
 | `--min-word-frequency N` | BERTopic 단어 행렬에서 최소 빈도 N을 충족하지 못한 희귀 단어를 제외합니다. | `1` | [min_df](https://maartengr.github.io/BERTopic/getting_started/vectorizers/vectorizers.html#min_df) |
 | `--max-vocabulary N` | 대규모 데이터의 키워드 후보 수와 메모리 사용량을 제한합니다. | 제한 없음 | [max_features](https://maartengr.github.io/BERTopic/getting_started/vectorizers/vectorizers.html#max_features) |
 | `--reduce-frequent-words` | 여러 주제에서 반복되는 흔한 단어의 영향력을 낮춥니다. | 사용 안 함 | [reduce_frequent_words](https://maartengr.github.io/BERTopic/getting_started/ctfidf/ctfidf.html#reduce_frequent_words) |
 | `--bm25-weighting` | 작은 데이터에서 흔한 단어가 대표어가 되는 현상을 줄입니다. | 사용 안 함 | [bm25_weighting](https://maartengr.github.io/BERTopic/getting_started/ctfidf/ctfidf.html#bm25_weighting) |
-| `--representation default|keybert|keybert-mmr` | 의미 기반으로 대표 키워드를 다듬습니다. | `default` | [KeyBERTInspired](https://maartengr.github.io/BERTopic/getting_started/representation/representation.html#keybertinspired) |
+| `--representation {default, keybert, keybert-mmr}` | 의미 기반으로 대표 키워드를 다듬습니다. | `default` | [KeyBERTInspired](https://maartengr.github.io/BERTopic/getting_started/representation/representation.html#keybertinspired) |
 | `--keyword-diversity 0..1` | `keybert-mmr`에서 비슷한 키워드의 중복을 줄입니다. | `0.3` | [MaximalMarginalRelevance](https://maartengr.github.io/BERTopic/getting_started/representation/representation.html#maximalmarginalrelevance) |
 | `--topic-words N` | 주제마다 CSV에 저장할 대표 키워드 수를 정합니다. | `10` | [top_n_words](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#top_n_words) |
 
@@ -302,7 +302,7 @@ uv run bertopic-cli ".\data\papers.xlsx" `
 |---|---|---|---|
 | `--umap-neighbors N` | 작게 설정하면 세밀한 구조, 크게 설정하면 전체적인 구조를 중시합니다. | 문서 수에 따라 최대 `15` | [n_neighbors](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#n_neighbors) |
 | `--min-samples N` | 낮추면 `-1` 이상치가 감소하지만 관련 없는 문서가 주제에 포함될 수 있습니다. | `min-topic-size`와 동일 | [min_samples](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#min_samples) |
-| `--outlier-strategy none|c-tf-idf|embeddings` | 학습 후 `-1` 문서를 가장 가까운 기존 주제에 다시 배정합니다. | `none` | [Outlier Reduction Strategies](https://maartengr.github.io/BERTopic/getting_started/outlier_reduction/outlier_reduction.html#strategies) |
+| `--outlier-strategy {none, c-tf-idf, embeddings}` | 학습 후 `-1` 문서를 가장 가까운 기존 주제에 다시 배정합니다. | `none` | [Outlier Reduction Strategies](https://maartengr.github.io/BERTopic/getting_started/outlier_reduction/outlier_reduction.html#strategies) |
 | `--outlier-threshold 0..1` | 유사도가 이 값 이상인 이상치만 다시 배정합니다. | `0.1` | [Outlier Reduction](https://maartengr.github.io/BERTopic/getting_started/outlier_reduction/outlier_reduction.html) |
 | `--low-memory`, `--no-low-memory` | 기본은 메모리 절약 모드입니다. 메모리가 충분하고 속도를 우선하면 끕니다. | 사용 | [low_memory](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#low_memory) |
 | `--calculate-probabilities` | 문서의 주제 배정 확률을 계산합니다. 시간과 메모리 사용량이 크게 늘 수 있습니다. | 사용 안 함 | [calculate_probabilities](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#calculate_probabilities) |
