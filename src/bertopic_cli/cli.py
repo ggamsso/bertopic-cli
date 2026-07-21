@@ -65,9 +65,9 @@ def parse_unit_interval(value: str) -> float:
     try:
         number = float(value)
     except ValueError as exc:
-        raise argparse.ArgumentTypeError("0과 1 사이의 숫자를 입력하세요.") from exc
+        raise argparse.ArgumentTypeError("0 이상 1 이하의 숫자를 입력하세요.") from exc
     if not 0 <= number <= 1:
-        raise argparse.ArgumentTypeError("0과 1 사이의 숫자를 입력하세요.")
+        raise argparse.ArgumentTypeError("0 이상 1 이하의 숫자를 입력하세요.")
     return number
 
 
@@ -167,8 +167,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--keyword-diversity",
         type=parse_unit_interval,
         default=0.3,
-        metavar="0..1",
-        help="keybert-mmr 키워드 다양성. 높을수록 중복이 줄어듭니다. 기본값: 0.3",
+        metavar="숫자",
+        help="keybert-mmr 키워드 다양성(0 이상 1 이하). 높을수록 중복이 줄어듭니다. 기본값: 0.3",
     )
     representation_group.add_argument(
         "--topic-words",
@@ -201,8 +201,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--outlier-threshold",
         type=parse_unit_interval,
         default=0.1,
-        metavar="0..1",
-        help="이상치 재배정에 필요한 최소 유사도. 기본값: 0.1",
+        metavar="숫자",
+        help="이상치 재배정에 필요한 최소 유사도(0 이상 1 이하). 기본값: 0.1",
     )
     clustering_group.add_argument(
         "--low-memory",

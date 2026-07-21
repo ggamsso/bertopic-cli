@@ -291,7 +291,7 @@ uv run bertopic-cli ".\data\papers.xlsx" `
 | `--reduce-frequent-words` | 여러 주제에서 반복되는 흔한 단어의 영향력을 낮춥니다. | 사용 안 함 | [reduce_frequent_words](https://maartengr.github.io/BERTopic/getting_started/ctfidf/ctfidf.html#reduce_frequent_words) |
 | `--bm25-weighting` | 작은 데이터에서 흔한 단어가 대표어가 되는 현상을 줄입니다. | 사용 안 함 | [bm25_weighting](https://maartengr.github.io/BERTopic/getting_started/ctfidf/ctfidf.html#bm25_weighting) |
 | `--representation {default, keybert, keybert-mmr}` | 의미 기반으로 대표 키워드를 다듬습니다. | `default` | [KeyBERTInspired](https://maartengr.github.io/BERTopic/getting_started/representation/representation.html#keybertinspired) |
-| `--keyword-diversity 0..1` | `keybert-mmr`에서 비슷한 키워드의 중복을 줄입니다. | `0.3` | [MaximalMarginalRelevance](https://maartengr.github.io/BERTopic/getting_started/representation/representation.html#maximalmarginalrelevance) |
+| `--keyword-diversity 숫자` | `keybert-mmr`에서 비슷한 키워드의 중복을 줄입니다. 0 이상 1 이하로 입력합니다. | `0.3` | [MaximalMarginalRelevance](https://maartengr.github.io/BERTopic/getting_started/representation/representation.html#maximalmarginalrelevance) |
 | `--topic-words N` | 주제마다 CSV에 저장할 대표 키워드 수를 정합니다. | `10` | [top_n_words](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#top_n_words) |
 
 `keybert`는 토픽 문서와 의미적으로 가까운 키워드를 선택합니다. `keybert-mmr`은 같은 과정을 거친 뒤 비슷한 키워드가 반복되지 않도록 다시 정렬합니다. `--keyword-diversity`가 `0`에 가까우면 유사 키워드를 유지하고 `1`에 가까우면 다양성을 더 중시합니다.
@@ -303,7 +303,7 @@ uv run bertopic-cli ".\data\papers.xlsx" `
 | `--umap-neighbors N` | 작게 설정하면 세밀한 구조, 크게 설정하면 전체적인 구조를 중시합니다. | 문서 수에 따라 최대 `15` | [n_neighbors](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#n_neighbors) |
 | `--min-samples N` | 낮추면 `-1` 이상치가 감소하지만 관련 없는 문서가 주제에 포함될 수 있습니다. | `min-topic-size`와 동일 | [min_samples](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#min_samples) |
 | `--outlier-strategy {none, c-tf-idf, embeddings}` | 학습 후 `-1` 문서를 가장 가까운 기존 주제에 다시 배정합니다. | `none` | [Outlier Reduction Strategies](https://maartengr.github.io/BERTopic/getting_started/outlier_reduction/outlier_reduction.html#strategies) |
-| `--outlier-threshold 0..1` | 유사도가 이 값 이상인 이상치만 다시 배정합니다. | `0.1` | [Outlier Reduction](https://maartengr.github.io/BERTopic/getting_started/outlier_reduction/outlier_reduction.html) |
+| `--outlier-threshold 숫자` | 유사도가 입력값 이상인 이상치만 다시 배정합니다. 0 이상 1 이하로 입력합니다. | `0.1` | [Outlier Reduction](https://maartengr.github.io/BERTopic/getting_started/outlier_reduction/outlier_reduction.html) |
 | `--low-memory`, `--no-low-memory` | 기본은 메모리 절약 모드입니다. 메모리가 충분하고 속도를 우선하면 끕니다. | 사용 | [low_memory](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#low_memory) |
 | `--calculate-probabilities` | 문서의 주제 배정 확률을 계산합니다. 시간과 메모리 사용량이 크게 늘 수 있습니다. | 사용 안 함 | [calculate_probabilities](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#calculate_probabilities) |
 
