@@ -201,16 +201,181 @@ uv run bertopic-cli documents.xlsx --sheet 설문응답 --text-columns title tex
 
 ## 결과 파일
 
-- `document_topics.csv`: 원본 문서별 주제 번호, 주제 이름, 대표 단어
+- `document_topics.csv`: 원본 문서별 주제 번호, 주제 이름, 대표 단어. `--calculate-probabilities`를 사용하면 `topic_probability` 열도 추가됩니다.
 - `topic_summary.csv`: 주제별 문서 수와 대표 단어
 - `topic_barchart.html`: 주제별 대표 단어 그래프
 - `topic_map.html`: 주제 사이의 관계를 보여주는 지도
 - `model/`: 나중에 재사용할 BERTopic 모델
-- `run_metadata.json`: 입력 파일과 실행 설정 기록
+- `run_metadata.json`: 입력 파일, 실제 적용된 최적화 설정, 이상치 재배정 수 기록
 
 CSV 결과는 UTF-8 BOM 형식으로 저장하므로 Excel에서 한글이 깨지지 않습니다.
 
-## 자주 쓰는 옵션
+## 처음 사용할 때 권장하는 설정
+
+먼저 별도 최적화 옵션 없이 실행해 결과를 확인합니다.
+
+```powershell
+uv run bertopic-cli ".\data\papers.xlsx" `
+  --text-columns "제목" "초록" `
+  --language multilingual
+```
+
+대표 키워드에 `연구`, `결과`, `분석`처럼 의미가 약한 단어가 반복될 때는 키워드 정리 옵션을 추가합니다.
+
+```powershell
+uv run bertopic-cli ".\data\papers.xlsx" `
+  --text-columns "제목" "초록" `
+  --language multilingual `
+  --min-word-frequency 2 `
+  --reduce-frequent-words `
+  --representation keybert
+```
+
+이 옵션들은 대표 키워드를 읽기 좋게 만들지만 문서가 어느 주제에 배정되는지는 직접 바꾸지 않습니다.
+
+## 불용어 파일 사용
+
+한국어에는 CLI가 자동 적용할 수 있는 공통 불용어 목록이 없습니다. 분석 목적에 맞는 단어를 한 줄에 하나씩 적은 UTF-8 텍스트 파일을 준비합니다. 불용어 하나에는 공백을 넣지 않습니다.
+
+```text
+# 설명 줄은 #으로 시작합니다.
+연구
+결과
+분석
+통해
+대한
+```
+
+예를 들어 위 내용을 `data\stopwords-ko.txt`로 저장했다면 다음처럼 사용합니다.
+
+```powershell
+uv run bertopic-cli ".\data\papers.xlsx" `
+  --text-columns "제목" "초록" `
+  --stopwords-file ".\data\stopwords-ko.txt" `
+  --reduce-frequent-words
+```
+
+불용어는 임베딩을 만들기 전 원문에서 삭제되지 않고, 토픽의 대표 키워드를 계산할 때만 제외됩니다. 따라서 문장의 의미 정보는 유지됩니다. `--language english`와 불용어 파일을 함께 사용하면 기본 영어 불용어와 파일의 단어를 모두 제외합니다.
+
+## 옵션 설명
+
+`공식 문서` 열의 링크는 각 CLI 옵션이 내부적으로 연결하는 BERTopic, UMAP, HDBSCAN 설정의 설명으로 이동합니다. 파일 읽기와 결과 저장처럼 이 프로젝트에서 직접 구현한 기능은 `CLI 자체 기능`으로 표시합니다.
+
+### 기본 옵션
+
+| 옵션 | 설명 | 기본값 | 공식 문서 |
+|---|---|---|---|
+| `input` | 분석할 CSV, TSV 또는 XLSX 파일입니다. | 필수 | CLI 자체 기능 |
+| `--text-columns 열1 열2 ...` | 분석할 열을 순서대로 합칩니다. 분석 실행 시 필수입니다. | 없음 | CLI 자체 기능 |
+| `--sheet 이름` | XLSX에서 읽을 시트를 선택합니다. | 첫 번째 시트 | CLI 자체 기능 |
+| `--language multilingual|english` | 한국어·혼합 언어 또는 영어 임베딩 모델을 선택합니다. | `multilingual` | [language](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#language) |
+| `--embedding-model 이름` | 사용할 SentenceTransformers 모델을 직접 지정합니다. | 언어별 자동 선택 | [Embeddings](https://maartengr.github.io/BERTopic/getting_started/embeddings/embeddings.html) |
+| `--min-topic-size N` | 주제 하나를 만들 최소 문서 수입니다. | 문서 수에 따라 자동 | [min_topic_size](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#min_topic_size) |
+| `--reduce-topics none|auto|N` | 생성된 주제를 나중에 합칩니다. | `none` | [Topic Reduction](https://maartengr.github.io/BERTopic/getting_started/topicreduction/topicreduction.html) |
+| `--random-seed N` | 반복 실행 결과를 재현하기 위한 난수값입니다. | `42` | [Preventing Stochastic Behavior](https://maartengr.github.io/BERTopic/getting_started/best_practices/best_practices.html#preventing-stochastic-behavior) |
+| `--output 폴더` | 결과를 저장할 폴더입니다. | 입력 파일 옆 자동 생성 | CLI 자체 기능 |
+| `--save-model`, `--no-save-model` | 학습 모델 저장 여부를 선택합니다. | 저장 | [Serialization](https://maartengr.github.io/BERTopic/getting_started/serialization/serialization.html) |
+| `--visualizations`, `--no-visualizations` | HTML 시각화 저장 여부를 선택합니다. | 저장 | [Visualization](https://maartengr.github.io/BERTopic/getting_started/visualization/visualization.html) |
+| `--list-columns` | 입력 파일의 열 이름만 출력합니다. | 사용 안 함 | CLI 자체 기능 |
+| `--quiet` | BERTopic 진행 로그를 줄입니다. | 사용 안 함 | CLI 자체 기능 |
+| `--version` | CLI 버전을 출력합니다. | 해당 없음 | CLI 자체 기능 |
+
+### 대표 키워드 최적화
+
+| 옵션 | 언제 사용하는가 | 기본값 | 공식 문서 |
+|---|---|---|---|
+| `--ngram-max 1|2|3` | `인공지능 교육`처럼 여러 단어로 된 표현을 찾습니다. | `2` | [ngram_range](https://maartengr.github.io/BERTopic/getting_started/vectorizers/vectorizers.html#ngram_range) |
+| `--stopwords-file 파일` | 조사, 상투어, 도메인 공통어를 대표 키워드에서 제외합니다. | 없음 | [stop_words](https://maartengr.github.io/BERTopic/getting_started/vectorizers/vectorizers.html#stop_words) |
+| `--min-word-frequency N` | BERTopic 단어 행렬에서 최소 빈도 N을 충족하지 못한 희귀 단어를 제외합니다. | `1` | [min_df](https://maartengr.github.io/BERTopic/getting_started/vectorizers/vectorizers.html#min_df) |
+| `--max-vocabulary N` | 대규모 데이터의 키워드 후보 수와 메모리 사용량을 제한합니다. | 제한 없음 | [max_features](https://maartengr.github.io/BERTopic/getting_started/vectorizers/vectorizers.html#max_features) |
+| `--reduce-frequent-words` | 여러 주제에서 반복되는 흔한 단어의 영향력을 낮춥니다. | 사용 안 함 | [reduce_frequent_words](https://maartengr.github.io/BERTopic/getting_started/ctfidf/ctfidf.html#reduce_frequent_words) |
+| `--bm25-weighting` | 작은 데이터에서 흔한 단어가 대표어가 되는 현상을 줄입니다. | 사용 안 함 | [bm25_weighting](https://maartengr.github.io/BERTopic/getting_started/ctfidf/ctfidf.html#bm25_weighting) |
+| `--representation default|keybert|keybert-mmr` | 의미 기반으로 대표 키워드를 다듬습니다. | `default` | [KeyBERTInspired](https://maartengr.github.io/BERTopic/getting_started/representation/representation.html#keybertinspired) |
+| `--keyword-diversity 0..1` | `keybert-mmr`에서 비슷한 키워드의 중복을 줄입니다. | `0.3` | [MaximalMarginalRelevance](https://maartengr.github.io/BERTopic/getting_started/representation/representation.html#maximalmarginalrelevance) |
+| `--topic-words N` | 주제마다 CSV에 저장할 대표 키워드 수를 정합니다. | `10` | [top_n_words](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#top_n_words) |
+
+`keybert`는 토픽 문서와 의미적으로 가까운 키워드를 선택합니다. `keybert-mmr`은 같은 과정을 거친 뒤 비슷한 키워드가 반복되지 않도록 다시 정렬합니다. `--keyword-diversity`가 `0`에 가까우면 유사 키워드를 유지하고 `1`에 가까우면 다양성을 더 중시합니다.
+
+### 주제 군집과 이상치 최적화
+
+| 옵션 | 언제 사용하는가 | 기본값 | 공식 문서 |
+|---|---|---|---|
+| `--umap-neighbors N` | 작게 설정하면 세밀한 구조, 크게 설정하면 전체적인 구조를 중시합니다. | 문서 수에 따라 최대 `15` | [n_neighbors](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#n_neighbors) |
+| `--min-samples N` | 낮추면 `-1` 이상치가 감소하지만 관련 없는 문서가 주제에 포함될 수 있습니다. | `min-topic-size`와 동일 | [min_samples](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#min_samples) |
+| `--outlier-strategy none|c-tf-idf|embeddings` | 학습 후 `-1` 문서를 가장 가까운 기존 주제에 다시 배정합니다. | `none` | [Outlier Reduction Strategies](https://maartengr.github.io/BERTopic/getting_started/outlier_reduction/outlier_reduction.html#strategies) |
+| `--outlier-threshold 0..1` | 유사도가 이 값 이상인 이상치만 다시 배정합니다. | `0.1` | [Outlier Reduction](https://maartengr.github.io/BERTopic/getting_started/outlier_reduction/outlier_reduction.html) |
+| `--low-memory`, `--no-low-memory` | 기본은 메모리 절약 모드입니다. 메모리가 충분하고 속도를 우선하면 끕니다. | 사용 | [low_memory](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#low_memory) |
+| `--calculate-probabilities` | 문서의 주제 배정 확률을 계산합니다. 시간과 메모리 사용량이 크게 늘 수 있습니다. | 사용 안 함 | [calculate_probabilities](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html#calculate_probabilities) |
+
+이상치 재배정은 내부적으로 토픽 생성과 `--reduce-topics` 처리가 끝난 뒤 실행됩니다. 재배정된 문서는 토픽 키워드와 문서 수에도 반영됩니다. 재배정으로 주제가 바뀐 문서에는 기존 확률을 잘못 표시하지 않도록 `topic_probability` 값을 비워 둡니다.
+
+## 상황별 조정 방법
+
+### 주제가 너무 많고 잘게 나뉘는 경우
+
+먼저 `--min-topic-size`를 키웁니다. 그래도 비슷한 주제가 많을 때 `--umap-neighbors`를 `30` 정도로 키우거나 마지막에 `--reduce-topics auto`를 사용합니다.
+
+```powershell
+uv run bertopic-cli documents.xlsx `
+  --text-columns text `
+  --min-topic-size 20 `
+  --umap-neighbors 30 `
+  --reduce-topics auto
+```
+
+### 주제가 너무 적고 크게 묶이는 경우
+
+`--min-topic-size`와 `--umap-neighbors`를 차례로 줄입니다. 한 번에 여러 값을 크게 바꾸지 말고 결과를 비교하는 것이 좋습니다.
+
+```powershell
+uv run bertopic-cli documents.xlsx `
+  --text-columns text `
+  --min-topic-size 5 `
+  --umap-neighbors 10
+```
+
+### `Outlier` 또는 주제 `-1`이 너무 많은 경우
+
+첫 번째 방법은 `--min-samples`를 `--min-topic-size`보다 작게 설정하는 것입니다. 그래도 이상치가 많고 모든 문서를 분류해야 한다면 `c-tf-idf` 재배정을 추가합니다.
+
+```powershell
+uv run bertopic-cli documents.xlsx `
+  --text-columns text `
+  --min-topic-size 10 `
+  --min-samples 5 `
+  --outlier-strategy c-tf-idf `
+  --outlier-threshold 0.1
+```
+
+`embeddings` 방식은 문서 의미를 직접 비교하지만 임베딩을 다시 계산할 수 있어 더 느립니다. 임계값을 너무 낮추면 관련 없는 문서도 억지로 주제에 들어갈 수 있습니다.
+
+### 대표 키워드가 읽기 어려운 경우
+
+불용어 파일, 희귀 단어 제외, 빈출 단어 감소를 먼저 적용하고 필요하면 `keybert-mmr`을 사용합니다.
+
+```powershell
+uv run bertopic-cli documents.xlsx `
+  --text-columns title abstract `
+  --stopwords-file stopwords-ko.txt `
+  --min-word-frequency 2 `
+  --reduce-frequent-words `
+  --representation keybert-mmr `
+  --keyword-diversity 0.3
+```
+
+### 메모리가 부족한 경우
+
+기본적으로 저메모리 모드가 켜져 있습니다. 추가로 희귀 단어와 전체 어휘 수를 제한하고, 확률 계산과 HTML 시각화를 끕니다.
+
+```powershell
+uv run bertopic-cli documents.xlsx `
+  --text-columns text `
+  --min-word-frequency 2 `
+  --max-vocabulary 10000 `
+  --no-visualizations
+```
+
+## 기타 자주 쓰는 명령
 
 입력 파일의 열 이름을 먼저 확인합니다.
 
@@ -242,11 +407,20 @@ uv run bertopic-cli documents.csv --text-columns text --no-save-model --no-visua
 uv run bertopic-cli --help
 ```
 
-## 결과 조정 요령
+## 조정할 때 기억할 점
 
-- 주제가 너무 잘게 나뉨: `--min-topic-size` 값을 키웁니다.
-- 대부분 `Outlier`가 됨: `--min-topic-size` 값을 줄입니다.
-- 비슷한 주제가 많음: `--reduce-topics auto`를 사용합니다.
-- 영어 문서만 있음: `--language english`를 사용합니다.
+- 한 번에 한두 옵션만 바꾸고 `run_metadata.json`을 함께 보관합니다.
+- 토픽 수는 `--reduce-topics`보다 `--min-topic-size`로 먼저 조정하는 것이 안정적입니다.
+- `--ngram-max`, 불용어, 단어 빈도, 표현 모델은 대표 키워드를 바꾸지만 문서 군집 자체는 바꾸지 않습니다.
+- `--umap-neighbors`, `--min-topic-size`, `--min-samples`, 임베딩 모델은 문서 군집을 바꿀 수 있습니다.
+- `--random-seed` 기본값이 `42`이므로 같은 입력과 옵션에서는 결과를 비교하기 쉽습니다.
 
 주제 번호 `-1` 또는 `Outlier`는 어느 주제에도 안정적으로 묶이지 않은 문서이며 오류가 아닙니다.
+
+## BERTopic 공식 참고 문서
+
+- [Parameter tuning](https://maartengr.github.io/BERTopic/getting_started/parameter%20tuning/parametertuning.html)
+- [Vectorizers](https://maartengr.github.io/BERTopic/getting_started/vectorizers/vectorizers.html)
+- [c-TF-IDF](https://maartengr.github.io/BERTopic/getting_started/ctfidf/ctfidf.html)
+- [Representation models](https://maartengr.github.io/BERTopic/getting_started/representation/representation.html)
+- [Outlier reduction](https://maartengr.github.io/BERTopic/getting_started/outlier_reduction/outlier_reduction.html)
