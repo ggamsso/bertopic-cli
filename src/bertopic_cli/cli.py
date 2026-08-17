@@ -215,6 +215,29 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="문서별 주제 확률을 계산하고 결과에 저장합니다. 실행 시간과 메모리가 증가합니다.",
     )
+
+    zeroshot_group = parser.add_argument_group("미리 아는 주제 지정(zero-shot)")
+    zeroshot_group.add_argument(
+        "--zeroshot-topics",
+        nargs="+",
+        metavar="주제",
+        help="미리 아는 주제 이름들. 각 이름을 따옴표로 묶으세요. 나머지 문서만 군집합니다.",
+    )
+    zeroshot_group.add_argument(
+        "--zeroshot-topics-file",
+        type=Path,
+        help="주제 이름을 한 줄에 하나씩 적은 UTF-8 텍스트 파일. --zeroshot-topics 대신 사용합니다.",
+    )
+    zeroshot_group.add_argument(
+        "--zeroshot-min-similarity",
+        type=parse_unit_interval,
+        default=0.7,
+        metavar="숫자",
+        help=(
+            "주제 이름에 배정할 최소 유사도(0 이상 1 이하). 기본값: 0.7. "
+            "초록처럼 긴 문서는 0.7에서 거의 배정되지 않아 0.4~0.55로 낮춰야 할 수 있습니다."
+        ),
+    )
     parser.add_argument(
         "--random-seed",
         type=int,
@@ -378,6 +401,43 @@ def load_stop_words(path: Path | None) -> list[str]:
     return words
 
 
+def load_zeroshot_topics(path: Path | None) -> list[str]:
+    if path is None:
+        return []
+    if not path.exists():
+        raise CLIError(f"zero-shot 주제 파일을 찾을 수 없습니다: {path}")
+    if not path.is_file():
+        raise CLIError(f"zero-shot 주제 경로가 파일이 아닙니다: {path}")
+    try:
+        lines = path.read_text(encoding="utf-8-sig").splitlines()
+    except (OSError, UnicodeError) as exc:
+        raise CLIError(f"zero-shot 주제 파일을 읽지 못했습니다: {exc}") from exc
+
+    labels = list(
+        dict.fromkeys(
+            line.strip()
+            for line in lines
+            if line.strip() and not line.lstrip().startswith("#")
+        )
+    )
+    if not labels:
+        raise CLIError("zero-shot 주제 파일에 사용할 주제가 없습니다.")
+    return labels
+
+
+def resolve_zeroshot_topics(inline: Sequence[str] | None, path: Path | None) -> list[str]:
+    if inline and path:
+        raise CLIError("--zeroshot-topics와 --zeroshot-topics-file은 함께 쓸 수 없습니다.")
+    if path:
+        return load_zeroshot_topics(path)
+    if not inline:
+        return []
+    labels = list(dict.fromkeys(label.strip() for label in inline if label.strip()))
+    if not labels:
+        raise CLIError("--zeroshot-topics에 사용할 주제가 없습니다.")
+    return labels
+
+
 def create_representation_model(
     name: str,
     topic_words: int,
@@ -420,6 +480,8 @@ def create_topic_model(
     min_samples: int | None = None,
     low_memory: bool = True,
     calculate_probabilities: bool = False,
+    zeroshot_topics: Sequence[str] = (),
+    zeroshot_min_similarity: float = 0.7,
 ) -> Any:
     from bertopic import BERTopic
     from bertopic.vectorizers import ClassTfidfTransformer
@@ -474,6 +536,8 @@ def create_topic_model(
             reduce_frequent_words=reduce_frequent_words,
         ),
         representation_model=representation_model,
+        zeroshot_topic_list=list(zeroshot_topics) or None,
+        zeroshot_min_similarity=zeroshot_min_similarity,
         top_n_words=topic_words,
         min_topic_size=min_topic_size,
         nr_topics=reduce_topics,
@@ -481,6 +545,20 @@ def create_topic_model(
         calculate_probabilities=calculate_probabilities,
         verbose=verbose,
     )
+
+
+def matched_zeroshot_topics(model: Any, zeroshot_topics: Sequence[str]) -> dict[int, str]:
+    """Map final topic id -> zero-shot name, for the names that actually matched.
+
+    BERTopic drops zero-shot names that no document reached, and renumbers the
+    rest from 0, so the requested list cannot be used as the mapping directly.
+    """
+    mapping = getattr(model, "_topic_id_to_zeroshot_topic_idx", None) or {}
+    return {
+        int(topic_id): zeroshot_topics[index]
+        for topic_id, index in mapping.items()
+        if 0 <= index < len(zeroshot_topics)
+    }
 
 
 def reduce_outlier_topics(
@@ -732,6 +810,15 @@ def run(argv: Sequence[str] | None = None) -> int:
 
         embedding_model = resolve_embedding_model(args.language, args.embedding_model)
         custom_stop_words = load_stop_words(args.stopwords_file)
+        zeroshot_topics = resolve_zeroshot_topics(
+            args.zeroshot_topics, args.zeroshot_topics_file
+        )
+        if zeroshot_topics and isinstance(args.reduce_topics, int):
+            if args.reduce_topics <= len(zeroshot_topics):
+                raise CLIError(
+                    f"--reduce-topics({args.reduce_topics})는 zero-shot 주제 수"
+                    f"({len(zeroshot_topics)})보다 커야 합니다."
+                )
         output_dir = args.output or default_output_dir(args.input)
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -744,6 +831,11 @@ def run(argv: Sequence[str] | None = None) -> int:
         print(f"UMAP 이웃 수: {umap_neighbors}, HDBSCAN min_samples: {min_samples}")
         if custom_stop_words:
             print(f"사용자 불용어: {len(custom_stop_words)}개")
+        if zeroshot_topics:
+            print(
+                f"zero-shot 주제: {len(zeroshot_topics)}개 "
+                f"(최소 유사도 {args.zeroshot_min_similarity})"
+            )
         print("BERTopic 분석을 시작합니다...")
 
         model = create_topic_model(
@@ -767,10 +859,38 @@ def run(argv: Sequence[str] | None = None) -> int:
             min_samples=min_samples,
             low_memory=args.low_memory,
             calculate_probabilities=args.calculate_probabilities,
+            zeroshot_topics=zeroshot_topics,
+            zeroshot_min_similarity=args.zeroshot_min_similarity,
         )
         topics, probabilities = model.fit_transform(input_data.documents)
         probability_topics = [int(topic) for topic in topics]
         outlier_count_before = sum(topic == -1 for topic in probability_topics)
+
+        matched_zeroshot = matched_zeroshot_topics(model, zeroshot_topics)
+        zeroshot_document_count = sum(
+            topic in matched_zeroshot for topic in probability_topics
+        )
+        if zeroshot_topics:
+            unmatched = [
+                label for label in zeroshot_topics if label not in matched_zeroshot.values()
+            ]
+            print(
+                f"zero-shot 배정: {zeroshot_document_count}개 문서, "
+                f"주제 {len(matched_zeroshot)}/{len(zeroshot_topics)}개 사용"
+            )
+            if unmatched:
+                print(
+                    f"주의: 문서를 받지 못해 제외된 zero-shot 주제 {len(unmatched)}개: "
+                    f"{', '.join(unmatched[:3])}"
+                    + (" 외" if len(unmatched) > 3 else ""),
+                    file=sys.stderr,
+                )
+            if not matched_zeroshot:
+                print(
+                    "주의: 최소 유사도를 넘은 문서가 없어 일반 군집만 수행했습니다. "
+                    "--zeroshot-min-similarity를 낮춰보세요.",
+                    file=sys.stderr,
+                )
         topics = reduce_outlier_topics(
             model,
             input_data.documents,
@@ -813,6 +933,12 @@ def run(argv: Sequence[str] | None = None) -> int:
             "outlier_threshold": args.outlier_threshold,
             "outlier_count_before_reduction": outlier_count_before,
             "outlier_documents_reassigned": reassigned_outliers,
+            "zeroshot_topics": zeroshot_topics,
+            "zeroshot_min_similarity": args.zeroshot_min_similarity if zeroshot_topics else None,
+            "zeroshot_topics_matched": [
+                matched_zeroshot[topic] for topic in sorted(matched_zeroshot)
+            ],
+            "zeroshot_document_count": zeroshot_document_count,
             "low_memory": args.low_memory,
             "calculate_probabilities": args.calculate_probabilities,
             "random_seed": args.random_seed,
