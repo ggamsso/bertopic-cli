@@ -193,7 +193,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     clustering_group.add_argument(
         "--outlier-strategy",
-        choices=("none", "c-tf-idf", "embeddings"),
+        choices=("none", "c-tf-idf", "embeddings", "distributions"),
         default="none",
         help="-1 이상치 문서를 주제에 다시 배정하는 방식. 기본값: none",
     )
