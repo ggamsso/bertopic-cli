@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
 from dataclasses import dataclass
@@ -12,6 +13,7 @@ from zipfile import BadZipFile
 from bertopic_cli import __version__
 
 
+COHERENCE_METRICS = ("c_npmi", "u_mass")
 ENGLISH_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 MULTILINGUAL_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
@@ -255,6 +257,15 @@ def build_parser() -> argparse.ArgumentParser:
         action=argparse.BooleanOptionalAction,
         default=True,
         help="HTML 시각화 저장 여부. 기본값: 저장",
+    )
+    parser.add_argument(
+        "--coherence",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "주제 품질 지표(coherence, 키워드 다양성) 계산 여부. 기본값: 계산. "
+            "문서 6천 건 기준 약 5초가 추가로 걸립니다."
+        ),
     )
     parser.add_argument(
         "--list-columns",
@@ -636,6 +647,75 @@ def topic_label(model: Any, topic: int, limit: int = 4) -> str:
     return label or f"Topic {topic}"
 
 
+def compute_coherence_metrics(
+    model: Any,
+    documents: Sequence[str],
+    topic_words: int = 10,
+) -> dict[str, object]:
+    """주제 품질 지표를 계산한다: coherence 3종과 키워드 다양성.
+
+    coherence는 유니그램만으로 계산한다. scikit-learn의 analyzer는 토큰을
+    [유니그램 전부, 바이그램 전부] 순서로 이어붙이기 때문에, 좁은 윈도우를
+    쓰는 c_npmi에서 "music"과 "music therapy" 같은 쌍이 실제보다 훨씬
+    멀리 떨어진 것으로 계산된다. 다양성은 윈도우와 무관하므로 사용자에게
+    보여주는 키워드 전체(바이그램 포함)로 센다.
+    """
+    from gensim.corpora import Dictionary
+    from gensim.models.coherencemodel import CoherenceModel
+
+    representations = {
+        int(topic): [word for word, _ in words if word][:topic_words]
+        for topic, words in model.get_topics().items()
+        if int(topic) != -1
+    }
+    representations = {topic: words for topic, words in representations.items() if words}
+    if not representations:
+        raise CLIError("이상치를 제외한 주제가 없어 품질 지표를 계산할 수 없습니다.")
+
+    analyzer = model.vectorizer_model.build_analyzer()
+    tokenized = [[word for word in analyzer(document) if " " not in word] for document in documents]
+    dictionary = Dictionary(tokenized)
+    corpus = [dictionary.doc2bow(tokens) for tokens in tokenized]
+
+    scored_topics = [
+        unigrams
+        for words in representations.values()
+        if len(unigrams := [word for word in words if word in dictionary.token2id]) >= 2
+    ]
+    if not scored_topics:
+        raise CLIError("주제 키워드가 문서 어휘와 겹치지 않아 coherence를 계산할 수 없습니다.")
+
+    metrics: dict[str, object] = {"topics_scored": len(scored_topics)}
+    for metric in COHERENCE_METRICS:
+        score = float(
+            CoherenceModel(
+                topics=scored_topics,
+                texts=tokenized,
+                corpus=corpus,
+                dictionary=dictionary,
+                coherence=metric,
+                processes=1,
+            ).get_coherence()
+        )
+        metrics[metric] = round(score, 4) if math.isfinite(score) else None
+
+    keywords = [word for words in representations.values() for word in words]
+    metrics["diversity"] = round(len(set(keywords)) / len(keywords), 4)
+    return metrics
+
+
+def format_coherence_metrics(metrics: dict[str, object]) -> str:
+    def label(value: object) -> str:
+        return f"{value:.4f}" if isinstance(value, (int, float)) else "측정불가"
+
+    return (
+        f"품질 지표: c_npmi {label(metrics.get('c_npmi'))} / "
+        f"u_mass {label(metrics.get('u_mass'))} / "
+        f"diversity {label(metrics.get('diversity'))} "
+        f"(주제 {metrics.get('topics_scored')}개 기준)"
+    )
+
+
 def build_result_tables(
     model: Any,
     input_data: InputData,
@@ -723,6 +803,7 @@ def write_outputs(
     topic_words: int = 10,
     probabilities: Any = None,
     probability_topics: Sequence[int] | None = None,
+    extra_warnings: Sequence[str] = (),
 ) -> list[str]:
     documents, summaries = build_result_tables(
         model,
@@ -750,9 +831,9 @@ def write_outputs(
         save_model(model, output_dir, str(metadata["embedding_model"]))
         output_names.append("model/")
 
-    warnings: list[str] = []
+    warnings: list[str] = list(extra_warnings)
     if should_save_visualizations:
-        warnings = save_visualizations(model, output_dir, topic_count)
+        warnings.extend(save_visualizations(model, output_dir, topic_count))
         for name in ("topic_barchart.html", "topic_map.html"):
             if (output_dir / name).exists():
                 output_names.append(name)
@@ -906,6 +987,22 @@ def run(argv: Sequence[str] | None = None) -> int:
             else:
                 print(f"이상치 재배정: {reassigned_outliers}개 문서")
 
+        coherence_metrics: dict[str, object] | None = None
+        coherence_warnings: list[str] = []
+        if args.coherence:
+            try:
+                coherence_metrics = compute_coherence_metrics(
+                    model,
+                    input_data.documents,
+                    args.topic_words,
+                )
+            except ImportError:
+                coherence_warnings.append(
+                    "gensim이 설치되지 않아 품질 지표를 건너뜁니다. uv sync로 의존성을 갱신하세요."
+                )
+            except Exception as exc:  # 지표 계산 실패로 분석 결과를 버리지 않는다
+                coherence_warnings.append(f"품질 지표를 계산하지 못했습니다: {exc}")
+
         metadata: dict[str, object] = {
             "cli_version": __version__,
             "input": str(args.input.resolve()),
@@ -942,6 +1039,7 @@ def run(argv: Sequence[str] | None = None) -> int:
             "low_memory": args.low_memory,
             "calculate_probabilities": args.calculate_probabilities,
             "random_seed": args.random_seed,
+            "coherence": coherence_metrics,
         }
         warnings = write_outputs(
             model=model,
@@ -954,11 +1052,14 @@ def run(argv: Sequence[str] | None = None) -> int:
             topic_words=args.topic_words,
             probabilities=probabilities if args.calculate_probabilities else None,
             probability_topics=probability_topics if args.calculate_probabilities else None,
+            extra_warnings=coherence_warnings,
         )
 
         topic_count = len({int(topic) for topic in topics if int(topic) != -1})
         outlier_count = sum(int(topic) == -1 for topic in topics)
         print(f"완료: 주제 {topic_count}개, 이상치 문서 {outlier_count}개")
+        if coherence_metrics is not None:
+            print(format_coherence_metrics(coherence_metrics))
         print(f"결과 폴더: {output_dir.resolve()}")
         for warning in warnings:
             print(f"주의: {warning}", file=sys.stderr)
